@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Web Termux</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #000; 
+            font-family: 'Courier New', monospace;
+            color: #00ff88;
+            padding: 20px;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .terminal {
+            background: #000;
+            height: calc(100vh - 40px);
+            overflow-y: auto;
+            padding: 10px;
+            border: 2px solid #00ff88;
+            border-radius: 5px;
+        }
+        .output { margin-bottom: 10px; }
+        .prompt { color: #ff79c6; }
+        .command { color: #00ff88; }
+        .error { color: #ff5555; }
+        .success { color: #50fa7b; }
+        .info { color: #8be9fd; }
+        #inputLine {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+        #cmdInput {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            outline: none;
+            padding-left: 5px;
+        }
+        .quick-cmd {
+            background: #333;
+            color: #fff;
+            border: 1px solid #00ff88;
+            padding: 3px 8px;
+            margin: 5px 2px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="terminal" id="terminal">
+        <div class="output" id="output">
+            <pre style="color:#ff79c6">
+  ████████╗███████╗██████╗ ███╗   ███╗██╗   ██╗██╗  ██╗
+  ╚══██╔══╝██╔════╝██╔══██╗████╗ ████║██║   ██║╚██╗██╔╝
+     ██║   █████╗  ██████╔╝██╔████╔██║██║   ██║ ╚███╔╝ 
+     ██║   ██╔══╝  ██╔══██╗██║╚██╔╝██║██║   ██║ ██╔██╗ 
+     ██║   ███████╗██║  ██║██║ ╚═╝ ██║╚██████╔╝██╔╝ ██╗
+     ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝
+            </pre>
+            <p>Web Termux v1.0 - Веб-интерпретатор команд</p>
+            <p>Введите 'help' для списка команд</p>
+            <div class="quick-commands">
+                <button class="quick-cmd" onclick="runCmd('help')">help</button>
+                <button class="quick-cmd" onclick="runCmd('neofetch')">neofetch</button>
+                <button class="quick-cmd" onclick="runCmd('pkg list')">pkg list</button>
+                <button class="quick-cmd" onclick="runCmd('ls -la')">ls -la</button>
+                <button class="quick-cmd" onclick="runCmd('clear')">clear</button>
+            </div>
+            <hr style="border-color:#333; margin:10px 0;">
+        </div>
+        <div id="inputLine">
+            <span class="prompt">[user@web-termux]~$ </span>
+            <input type="text" id="cmdInput" autocomplete="off" autofocus>
+        </div>
+    </div>
+
+    <script>
+        const output = document.getElementById('output');
+        const cmdInput = document.getElementById('cmdInput');
+        const terminal = document.getElementById('terminal');
+        let cmdHistory = [];
+        let histIndex = -1;
+
+        // Команды
+        const commands = {
+            help: () => `Доступные команды:
+• help - эта справка
+• clear - очистить экран
+• neofetch - информация о системе
+• pkg [install/remove/list/upgrade] - управление пакетами
+• ls [опции] - список файлов
+• cd [директория] - сменить директорию
+• cat [файл] - показать файл
+• mkdir [имя] - создать папку
+• rm [файл] - удалить файл
+• python - запуск Python
+• node - запуск Node.js
+• git [команда] - работа с git
+• date - дата и время
+• whoami - имя пользователя
+• echo [текст] - вывод текста`,
+
+            neofetch: () => `
+OS: Web Termux v1.0
+Host: Browser ${navigator.userAgent.split(' ')[0]}
+Kernel: JavaScript ES6
+Uptime: Always online
+Shell: web-termux
+Terminal: ${navigator.platform}
+CPU: Virtual processor
+Memory: Unlimited (browser)
+`,
+
+            'pkg list': () => `Установленные пакеты:
+• termux-tools
+• python
+• nodejs
+• git
+• nano
+• curl
+• wget
+• ssh`,
+
+            'pkg install': (args) => `Установка ${args || 'пакета'}... [симуляция]`,
+
+            'pkg upgrade': () => `Обновление всех пакетов... [симуляция]`,
+
+            'ls': (args) => {
+                const files = {
+                    'index.html': '1.2K',
+                    'script.js': '4.8K',
+                    'style.css': '2.1K',
+                    'README.md': '0.5K',
+                    'projects/': 'DIR',
+                    'downloads/': 'DIR',
+                    'documents/': 'DIR'
+                };
+                if (args && args.includes('-la')) {
+                    return Object.entries(files).map(([name, size]) => 
+                        `${size === 'DIR' ? 'drwxr-xr-x' : '-rw-r--r--'} 1 user user ${size.padStart(6)} ${name}`
+                    ).join('\n');
+                }
+                return Object.keys(files).join('  ');
+            },
+
+            'cd': (dir) => `Переход в ${dir || 'домашнюю директорию'}`,
+
+            'cat': (file) => `Содержимое ${file || 'файла'}:\n# Это пример файла\n# Создан в Web Termux\n# ${new Date().toLocaleString()}`,
+
+            'mkdir': (name) => `Создана директория: ${name || 'new_folder'}`,
+
+            'rm': (file) => `Удален: ${file || 'файл'}`,
+
+            'python': () => `Python 3.10.0 (симуляция)
+>>> print("Hello from Web Termux!")
+Hello from Web Termux!
+>>> exit()`,
+
+            'node': () => `Welcome to Node.js v16.0.0 (симуляция)
+> console.log("Web Termux rocks!")
+Web Termux rocks!
+> .exit`,
+
+            'git': (args) => `git ${args || '--version'}
+git version 2.35.1 (симуляция)`,
+
+            'date': () => new Date().toLocaleString('ru-RU'),
+
+            'whoami': () => 'web-termux-user',
+
+            'echo': (text) => text || '',
+
+            'clear': () => { output.innerHTML = ''; return ''; }
+        };
+
+        // Запуск команды
+        function runCmd(cmd) {
+            if (!cmd) return;
+            
+            // Показать команду
+            const cmdLine = document.createElement('div');
+            cmdLine.innerHTML = `<span class="prompt">[user@web-termux]~$ </span><span class="command">${cmd}</span>`;
+            output.appendChild(cmdLine);
+            
+            // Обработка команды
+            cmdHistory.push(cmd);
+            histIndex = cmdHistory.length;
+            
+            const parts = cmd.split(' ');
+            const baseCmd = parts[0];
+            const args = parts.slice(1).join(' ');
+            
+            let result = '';
+            if (commands[baseCmd]) {
+                result = commands[baseCmd](args);
+            } else if (commands[cmd]) {
+                result = commands[cmd]();
+            } else {
+                result = `bash: ${baseCmd}: команда не найдена\nВведите 'help' для списка команд`;
+            }
+            
+            // Показать результат
+            if (result) {
+                const resultDiv = document.createElement('div');
+                resultDiv.className = baseCmd === 'clear' ? '' : 'info';
+                resultDiv.textContent = result;
+                output.appendChild(resultDiv);
+            }
+            
+            // Прокрутка вниз
+            cmdInput.value = '';
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        // Обработка ввода
+        cmdInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                runCmd(cmdInput.value.trim());
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (histIndex > 0) {
+                    histIndex--;
+                    cmdInput.value = cmdHistory[histIndex] || '';
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (histIndex < cmdHistory.length - 1) {
+                    histIndex++;
+                    cmdInput.value = cmdHistory[histIndex] || '';
+                } else {
+                    histIndex = cmdHistory.length;
+                    cmdInput.value = '';
+                }
+            }
+        });
+
+        // Автофокус
+        document.addEventListener('click', () => cmdInput.focus());
+        cmdInput.focus();
+    </script>
+</body>
+</html>
